@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Stats | QuizMaster</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!-- Chart.js -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: Arial, sans-serif;
+        }
+
+        .container {
+            max-width: 900px;
+            background: white;
+            padding: 20px;
+            margin-top: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .back-button {
+            display: inline-block;
+            margin-bottom: 15px;
+            background-color: #007bff;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .back-button:hover {
+            background-color: #0056b3;
+        }
+
+        .section {
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #f1f1f1;
+            border-radius: 5px;
+        }
+
+        .chart-container {
+            max-width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        canvas {
+            max-width: 300px !important;
+            max-height: 300px !important;
+        }
+
+        .form-select, .btn {
+            width: 100%;
+        }
+
+        h2, h3 {
+            color: #333;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <a href="{{ url_for('admin_dashboard') }}" class="back-button">⬅ Back to Admin Dashboard</a>
+        <h2 class="text-center">Quiz Performance Statistics</h2>
+
+        <!-- Selection Section -->
+        <div class="section">
+            <label for="subjectSelect" class="form-label">Select Subject:</label>
+            <select id="subjectSelect" class="form-select">
+                {% for subject in subjects %}
+                <option value="{{ subject.id }}">{{ subject.name }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="chapterSelect" class="form-label mt-3">Select Chapter:</label>
+            <select id="chapterSelect" class="form-select">
+                <option value="">Select Chapter</option>
+            </select>
+
+            <label for="quizSelect" class="form-label mt-3">Select Quiz:</label>
+            <select id="quizSelect" class="form-select">
+                <option value="">Select Quiz</option>
+            </select>
+
+            <button class="btn btn-primary mt-3" onclick="fetchStats()">Show Stats</button>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="mt-4">
+            <h3 class="text-center">Score Distribution</h3>
+            <div class="chart-container">
+                <canvas id="scorePieChart"></canvas>
+            </div>
+
+            <h3 class="text-center mt-4">Score Frequency Histogram</h3>
+            <div class="chart-container">
+                <canvas id="scoreHistogram"></canvas>
+            </div>
+
+            <h3 class="text-center mt-4">Performance Over Time</h3>
+            <div class="chart-container">
+                <canvas id="scoreLineChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let pieChart, histogramChart, lineChart; // Store chart instances
+
+        async function fetchStats() {
+            let quizId = document.getElementById("quizSelect").value;
+            if (!quizId) {
+                alert("Please select a quiz.");
+                return;
+            }
+
+            let response = await fetch(`/admin/quiz_stats_data/${quizId}`);
+            let data = await response.json();
+
+            // 🧹 Destroy old charts before creating new ones
+            if (pieChart) pieChart.destroy();
+            if (histogramChart) histogramChart.destroy();
+            if (lineChart) lineChart.destroy();
+
+            // 🎨 Update Charts
+            pieChart = updatePieChart(data.scoreDistribution);
+            histogramChart = updateHistogram(data.scores);
+            lineChart = updateLineChart(data.timeSeries);
+        }
+
+        function updatePieChart(scoreDistribution) {
+            return new Chart(document.getElementById("scorePieChart"), {
+                type: 'pie',
+                data: {
+                    labels: ["0-40%", "41-60%", "61-80%", "81-100%"],
+                    datasets: [{
+                        data: scoreDistribution,
+                        backgroundColor: ["red", "orange", "yellow", "green"]
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        function updateHistogram(scores) {
+            return new Chart(document.getElementById("scoreHistogram"), {
+                type: 'bar',
+                data: {
+                    labels: scores.map(s => s.user),
+                    datasets: [{
+                        label: "User Scores",
+                        data: scores.map(s => s.score),
+                        backgroundColor: "blue"
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        function updateLineChart(timeSeries) {
+            return new Chart(document.getElementById("scoreLineChart"), {
+                type: 'line',
+                data: {
+                    labels: timeSeries.map(t => t.date),
+                    datasets: [{
+                        label: "Scores Over Time",
+                        data: timeSeries.map(t => t.score),
+                        borderColor: "green",
+                        fill: false
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        // 🔄 Subject Selection: Fetch Chapters Dynamically
+        document.getElementById("subjectSelect").addEventListener("change", async function () {
+            let subjectId = this.value;
+            let response = await fetch(`/admin/get_chapters/${subjectId}`);
+            let chapters = await response.json();
+
+            let chapterSelect = document.getElementById("chapterSelect");
+            chapterSelect.innerHTML = '<option value="">Select Chapter</option>';
+            chapters.forEach(chapter => {
+                chapterSelect.innerHTML += `<option value="${chapter.id}">${chapter.name}</option>`;
+            });
+
+            document.getElementById("quizSelect").innerHTML = '<option value="">Select Quiz</option>';
+        });
+
+        // 🔄 Chapter Selection: Fetch Quizzes Dynamically
+        document.getElementById("chapterSelect").addEventListener("change", async function () {
+            let chapterId = this.value;
+            let response = await fetch(`/admin/get_quizzes/${chapterId}`);
+            let quizzes = await response.json();
+
+            let quizSelect = document.getElementById("quizSelect");
+            quizSelect.innerHTML = '<option value="">Select Quiz</option>';
+            quizzes.forEach(quiz => {
+                quizSelect.innerHTML += `<option value="${quiz.id}">${quiz.title}</option>`;
+            });
+        });
+    </script>
+
+</body>
+
+</html>

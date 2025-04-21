@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attempt Quiz | QuizMaster</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+
+<body class="bg-light">
+
+    <div class="container mt-5">
+        <div class="text-center mb-4">
+            <h2 class="fw-bold text-primary">{{ quiz.title }}</h2>
+            <p class="text-muted">{{ quiz.description }}</p>
+        </div>
+
+        <!-- Timer Section -->
+        <div class="text-center mb-4">
+            <h4>Time Remaining: 
+                <span id="quiz-timer" class="badge bg-danger fs-5 px-3 py-2"></span>
+            </h4>
+        </div>
+
+        {% if score is not none %}
+        <div class="alert alert-success text-center">
+            <h4 class="mb-0">You scored {{ score }}%</h4>
+        </div>
+        {% endif %}
+
+        <!-- Retake Quiz Button -->
+        <div class="text-center mt-3 mb-4">
+            <a href="{{ url_for('user.attempt_quiz', quiz_id=quiz.id, user_id=user_id) }}" class="btn btn-primary btn-lg"
+                onclick="resetQuizTimer()">Retake Quiz</a>
+        </div>
+
+        <!-- Quiz Form -->
+        <form id="quiz-form" action="{{ url_for('user.submit_quiz', quiz_id=quiz.id, user_id=user_id) }}" method="POST">
+            {% for question in questions %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="card-title fw-bold text-dark">{{ loop.index }}. {{ question.text }}</h5>
+                    <hr>
+                    {% for option in question.options %}
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="question_{{ question.id }}"
+                            value="{{ option.id }}" id="option_{{ option.id }}">
+                        <label class="form-check-label text-dark fw-normal" for="option_{{ option.id }}">
+                            {{ option.text }}
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+
+            <button type="submit" class="btn btn-success w-100 btn-lg" id="submit-button">Submit Quiz</button>
+        </form>
+
+        <!-- Exit Exam Button -->
+        <div class="text-center mt-4">
+            <a href="{{ url_for('view_quizzes', chapter_id=quiz.chapter_id, user_id=user_id) }}" class="btn btn-danger btn-lg"
+                onclick="resetQuizData()">Exit Exam</a>
+        </div>
+    </div>
+
+    <script>
+        function resetQuizData() {
+            localStorage.removeItem("quiz-timeLeft");
+            localStorage.removeItem("quiz-expired");
+            localStorage.removeItem("currentQuizId");
+        }
+
+        let currentQuizId = "{{ quiz.id }}";
+        let storedQuizId = localStorage.getItem("currentQuizId");
+
+        if (storedQuizId !== currentQuizId) {
+            resetQuizData();
+            localStorage.setItem("currentQuizId", currentQuizId);
+        }
+
+        let timeLeft = localStorage.getItem("quiz-timeLeft");
+        if (isNaN(timeLeft) || timeLeft <= 0) {
+            timeLeft = 0;
+        }
+        if (!timeLeft || isNaN(timeLeft)) {
+            timeLeft = parseInt('{{ time_limit }}', 10);
+        } else {
+            timeLeft = parseInt(timeLeft, 10);
+        }
+
+        const timerElement = document.getElementById('quiz-timer');
+        const quizForm = document.getElementById("quiz-form");
+        const submitButton = document.getElementById("submit-button");
+        const options = document.querySelectorAll(".form-check-input");
+
+        function disableSubmission() {
+            options.forEach(option => option.disabled = true);
+            submitButton.disabled = true;
+            submitButton.innerText = "Time Up! Submission Disabled";
+            localStorage.setItem("quiz-expired", "true");
+            quizForm.onsubmit = function (event) {
+                event.preventDefault();
+                alert("Time is up! You can’t submit anymore.");
+            };
+        }
+
+        function updateTimer() {
+            if (localStorage.getItem("quiz-expired") === "true") {
+                disableSubmission();
+                return;
+            }
+
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                alert("Time is up! Submitting quiz...");
+                disableSubmission();
+                setTimeout(() => {
+                    quizForm.submit();
+                }, 1000);
+            } else {
+                let minutes = Math.floor(timeLeft / 60);
+                let seconds = timeLeft % 60;
+                timerElement.innerText = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                timeLeft--;
+                localStorage.setItem("quiz-timeLeft", timeLeft);
+            }
+        }
+
+        updateTimer();
+        const timerInterval = setInterval(updateTimer, 1000);
+
+        quizForm.addEventListener("submit", function (event) {
+            if (localStorage.getItem("quiz-expired") === "true") {
+                event.preventDefault();
+                alert("Time is up! You can’t submit anymore.");
+            } else {
+                resetQuizData();
+            }
+        });
+
+    </script>
+
+</body>
+</html>

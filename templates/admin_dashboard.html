@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        :root {
+            --primary-color: #4a6fa5;
+            --secondary-color: #6c757d;
+            --light-bg: #f8f9fa;
+            --border-radius: 6px;
+            --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f7fa;
+            margin: 0;
+            padding: 0;
+        }
+        
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--box-shadow);
+        }
+        
+        main {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+            font-weight: 500;
+        }
+        
+        button:hover {
+            background-color: #3a5a8a;
+            transform: translateY(-2px);
+        }
+        
+        section {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto; /* CHANGE 2: Allow vertical scrolling */
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            width: 80%;
+            max-width: 600px;
+            animation: modalFade 0.3s ease-in-out;
+        }
+        
+        @keyframes modalFade {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .close {
+            color: var(--secondary-color);
+            float: right;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        
+        .close:hover {
+            color: #000;
+        }
+        
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        input, select, textarea {
+            padding: 0.7rem;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            font-family: inherit;
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(74, 111, 165, 0.2);
+        }
+        
+        .option {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .option input[type="text"] {
+            flex: 1;
+        }
+        
+        #options-container {
+            background-color: var(--light-bg);
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin: 1rem 0;
+        }
+        
+        h2, h3, h4 {
+            color: var(--primary-color);
+            margin-top: 1.5rem;
+        }
+        
+        .subject-section {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            margin-bottom: 1.5rem;
+        }
+        
+        .chapter-section {
+            background-color: var(--light-bg);
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin: 1rem 0;
+        }
+        
+        .quiz-item {
+            background-color: white;
+            padding: 0.8rem;
+            border-radius: var(--border-radius);
+            margin: 0.8rem 0;
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .admin-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        
+        .btn-info {
+            text-decoration: none;
+        }
+        
+        .btn-info button {
+            background-color: var(--secondary-color);
+        }
+        
+        .btn-info button:hover {
+            background-color: #5a6268;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Admin Dashboard</h1>
+        <nav>
+            <a href="/logout"><button>Logout</button></a>
+        </nav>
+    </header>
+    <form action="{{ url_for('admin.admin_search') }}" method="GET" class="d-flex mb-4">
+        <input type="text" name="q" placeholder="Search users, subjects, or quizzes..." class="form-control me-2" required>
+        <button type="submit" class="btn btn-primary">Search</button>
+    </form>    
+    <main>
+        <section>
+            <button class="open-modal" data-modal="subject-modal">Add Subject</button>
+            <button class="open-modal" data-modal="chapter-modal">Add Chapter</button>
+            <button class="open-modal" data-modal="quiz-modal">Add Quiz</button>
+            <button class="open-modal" data-modal="question-modal">Add Question</button>
+        </section>
+
+        <div class="subject-section">
+            <h2>Subjects & Chapters</h2>
+            {% for subject in subjects_with_chapters %}
+            <div class="subject-item">
+                <h3>Subject: {{ subject.name }}</h3>
+                {% for chapter in subject.chapters %}
+                <div class="chapter-section">
+                    <h4>Chapter: {{ chapter.name }}</h4>
+                    {% for quiz in chapter.quizzes %}
+                    <div class="quiz-item">
+                        <p>Quiz: {{ quiz.title }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="admin-actions">
+            <a href="{{ url_for('admin.manage_quiz') }}" class="btn btn-info">
+                <button>Manage Quiz</button>
+            </a>
+
+            <a href="{{ url_for('admin.manage_users') }}" class="btn btn-info">
+                <button>Manage Users</button>
+            </a>
+            
+            <a href="{{ url_for('admin.quiz_stats') }}" class="btn btn-info">
+                <button>Quiz Stats</button>
+            </a>
+
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-info">
+                <button>Refresh</button>
+            </a>
+        </div>
+    </main>
+
+    <!-- Subject Modal -->
+    <div id="subject-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Add Subject</h2>
+            <form id="subject-form">
+                <input type="text" id="subject-name" placeholder="Subject Name" required>
+                <textarea id="subject-description" placeholder="Description"></textarea>
+                <button type="submit">Add</button>
+            </form>
+            <p id="subject-message"></p>
+        </div>
+    </div>
+
+    <!-- Chapter Modal -->
+    <div id="chapter-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Add Chapter</h2>
+            <form id="chapter-form">
+                <select id="chapter-subject"></select>
+                <input type="text" id="chapter-name" placeholder="Chapter Name" required>
+                <textarea id="chapter-description" placeholder="Description"></textarea>
+                <button type="submit">Add</button>
+            </form>
+            <p id="chapter-message"></p>
+        </div>
+    </div>
+
+    <!-- Quiz Modal -->
+    <div id="quiz-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Add Quiz</h2>
+            <form id="quiz-form">
+                <select id="quiz-subject" required>
+                    <option value="">Select Subject</option>
+                </select>
+                <select id="quiz-chapter" required>
+                    <option value="">Select Chapter</option>
+                </select>
+                <input type="text" id="quiz-title" placeholder="Quiz Title" required>
+                <textarea id="quiz-description" placeholder="Quiz Description"></textarea>
+                <input type="number" id="quiz-duration" placeholder="Duration (minutes)" required min="1">
+                <button type="submit">Add Quiz</button>
+            </form>
+            <p id="quiz-message"></p>
+        </div>
+    </div>
+
+    <!-- Question Modal -->
+    <div id="question-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Add Question</h2>
+            <form id="question-form">
+                <!-- Subject Dropdown -->
+                <select id="question-subject" required>
+                    <option value="">Select Subject</option>
+                </select>
+
+                <!-- Chapter Dropdown -->
+                <select id="question-chapter" required>
+                    <option value="">Select Chapter</option>
+                </select>
+
+                <!-- Quiz Dropdown -->
+                <select id="question-quiz" required>
+                    <option value="">Select Quiz</option>
+                </select>
+
+                <!-- Question Text -->
+                <textarea id="question-text" placeholder="Enter Question" required></textarea>
+
+                <!-- Options Container -->
+                <div id="options-container">
+                    <div class="option">
+                        <input type="text" class="option-text" placeholder="Option 1" required>
+                        <input type="radio" name="correct-option" value="0">
+                    </div>
+                    <div class="option">
+                        <input type="text" class="option-text" placeholder="Option 2" required>
+                        <input type="radio" name="correct-option" value="1">
+                    </div>
+                    <div class="option">
+                        <input type="text" class="option-text" placeholder="Option 3">
+                        <input type="radio" name="correct-option" value="2">
+                    </div>
+                    <div class="option">
+                        <input type="text" class="option-text" placeholder="Option 4">
+                        <input type="radio" name="correct-option" value="3">
+                    </div>
+                </div>
+
+                <button type="button" id="add-option">Add Option</button>
+                <button type="submit">Add Question</button>
+            </form>
+            <p id="question-message"></p>
+        </div>
+    </div>
+
+    <script>
+        function loadSubjects() {
+
+            fetch('/admin/get_subjects')
+                .then(response => response.json())
+                .then(data => {
+                    let subjectDropdown = document.getElementById('chapter-subject');
+                    subjectDropdown.innerHTML = '<option value="">Select Subject</option>';
+                    data.forEach(subject => {
+                        let option = document.createElement('option');
+                        option.value = subject.id;
+                        option.textContent = subject.name;
+                        subjectDropdown.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error loading subjects:', error));
+        }
+        // Load subjects when "Add Question" modal is opened
+        document.querySelector('[data-modal="question-modal"]').addEventListener('click', function () {
+            fetch('/admin/get_subjects')
+                .then(response => response.json())
+                .then(subjects => {
+                    let subjectDropdown = document.getElementById('question-subject');
+                    subjectDropdown.innerHTML = '<option value="">Select Subject</option>';
+                    subjects.forEach(subject => {
+                        let option = document.createElement('option');
+                        option.value = subject.id;
+                        option.textContent = subject.name;
+                        subjectDropdown.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error loading subjects:', error));
+        });
+
+        // Load chapters when a subject is selected
+        document.getElementById('question-subject').addEventListener('change', function () {
+            let subjectId = this.value;
+            if (!subjectId) return;
+
+            fetch(`/admin/get_chapters/${subjectId}`)
+                .then(response => response.json())
+                .then(chapters => {
+                    let chapterDropdown = document.getElementById('question-chapter');
+                    chapterDropdown.innerHTML = '<option value="">Select Chapter</option>';
+                    chapters.forEach(chapter => {
+                        let option = document.createElement('option');
+                        option.value = chapter.id;
+                        option.textContent = chapter.name;
+                        chapterDropdown.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error loading chapters:', error));
+        });
+
+        // Load quizzes when a chapter is selected
+        document.getElementById('question-chapter').addEventListener('change', function () {
+            let chapterId = this.value;
+            if (!chapterId) return;
+
+            fetch(`/admin/get_quizzes/${chapterId}`)
+                .then(response => response.json())
+                .then(quizzes => {
+                    let quizDropdown = document.getElementById('question-quiz');
+                    quizDropdown.innerHTML = '<option value="">Select Quiz</option>';
+                    quizzes.forEach(quiz => {
+                        let option = document.createElement('option');
+                        option.value = quiz.id;
+                        option.textContent = quiz.title;
+                        quizDropdown.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error loading quizzes:', error));
+        });
+
+        // Load subjects when the modal opens
+        document.querySelector('[data-modal="chapter-modal"]').addEventListener('click', loadSubjects);
+
+        document.getElementById('subject-form').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            fetch('/admin/add_subject', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: document.getElementById('subject-name').value,
+                    description: document.getElementById('subject-description').value
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('subject-message').textContent = data.message;
+                    document.getElementById('subject-message').style.color = "green";
+                    document.getElementById('subject-form').reset();
+                })
+                .catch(error => {
+                    document.getElementById('subject-message').textContent = "Failed to add subject.";
+                    document.getElementById('subject-message').style.color = "red";
+                });
+        });
+
+        document.getElementById('chapter-form').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            fetch('/admin/add_chapter', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    subject_id: document.getElementById('chapter-subject').value,
+                    name: document.getElementById('chapter-name').value,
+                    description: document.getElementById('chapter-description').value
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('chapter-message').textContent = data.message;
+                    document.getElementById('chapter-message').style.color = "green";
+                    document.getElementById('chapter-form').reset();
+                })
+                .catch(error => {
+                    document.getElementById('chapter-message').textContent = "Failed to add chapter.";
+                    document.getElementById('chapter-message').style.color = "red";
+                });
+        });
+
+        document.querySelectorAll('.open-modal').forEach(button => {
+            button.addEventListener('click', function () {
+                let modal = document.getElementById(this.dataset.modal);
+                if (modal) {
+                    modal.style.display = 'block';
+                }
+            });
+        });
+
+        document.querySelectorAll('.close').forEach(span => {
+            span.addEventListener('click', function () {
+                this.closest('.modal').style.display = 'none';
+            });
+        });
+
+        window.addEventListener('click', function (event) {
+            document.querySelectorAll('.modal').forEach(modal => {
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        });
+
+        function loadSubjectsAndChapters() {
+            fetch('/admin/get_subjects')
+                .then(response => response.json())
+                .then(subjects => {
+                    let subjectDropdown = document.getElementById('quiz-subject');
+                    subjectDropdown.innerHTML = '<option value="">Select Subject</option>';
+                    subjects.forEach(subject => {
+                        let option = document.createElement('option');
+                        option.value = subject.id;
+                        option.textContent = subject.name;
+                        subjectDropdown.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error loading subjects:', error));
+        }
+
+        // Load chapters when a subject is selected
+        document.getElementById('quiz-subject').addEventListener('change', function () {
+            let subjectId = this.value;
+            if (!subjectId) return;
+
+            fetch(`/admin/get_chapters/${subjectId}`)
+                .then(response => response.json())
+                .then(chapters => {
+                    let chapterDropdown = document.getElementById('quiz-chapter');
+                    chapterDropdown.innerHTML = '<option value="">Select Chapter</option>';
+                    chapters.forEach(chapter => {
+                        let option = document.createElement('option');
+                        option.value = chapter.id;
+                        option.textContent = chapter.name;
+                        chapterDropdown.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error loading chapters:', error));
+        });
+
+        // Open modal and load subjects
+        document.querySelector('[data-modal="quiz-modal"]').addEventListener('click', loadSubjectsAndChapters);
+
+        // Submit Quiz Form
+        document.getElementById('quiz-form').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            fetch('/admin/add_quiz', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chapter_id: document.getElementById('quiz-chapter').value,
+                    title: document.getElementById('quiz-title').value,
+                    description: document.getElementById('quiz-description').value,
+                    time_limit: document.getElementById('quiz-duration').value
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('quiz-message').textContent = data.message;
+                    document.getElementById('quiz-message').style.color = "green";
+                    document.getElementById('quiz-form').reset();
+                })
+                .catch(error => {
+                    document.getElementById('quiz-message').textContent = "Failed to add quiz.";
+                    document.getElementById('quiz-message').style.color = "red";
+                });
+        });
+
+        document.getElementById('question-form').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            let options = [];
+            let correctIndex = null;
+
+            document.querySelectorAll('.option').forEach((option, index) => {
+                let text = option.querySelector('.option-text').value;
+                if (text.trim() !== '') {
+                    options.push(text);
+                }
+                if (option.querySelector('input[type="radio"]').checked) {
+                    correctIndex = index;
+                }
+            });
+
+            if (options.length < 2) {
+                document.getElementById('question-message').textContent = "Please add at least two options.";
+                document.getElementById('question-message').style.color = "red";
+                return;
+            }
+
+            if (correctIndex === null) {
+                document.getElementById('question-message').textContent = "Please select the correct answer.";
+                document.getElementById('question-message').style.color = "red";
+                return;
+            }
+
+            fetch('/admin/add_question', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    quiz_id: document.getElementById('question-quiz').value,
+                    question_text: document.getElementById('question-text').value,
+                    options: options,
+                    correct_index: correctIndex
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('question-message').textContent = data.message;
+                    document.getElementById('question-message').style.color = "green";
+                    document.getElementById('question-form').reset();
+                })
+                .catch(error => {
+                    document.getElementById('question-message').textContent = "Failed to add question.";
+                    document.getElementById('question-message').style.color = "red";
+                });
+        });
+
+        // Function to dynamically add more options
+        document.getElementById('add-option').addEventListener('click', function () {
+            let optionsContainer = document.getElementById('options-container');
+            let optionCount = optionsContainer.getElementsByClassName('option').length;
+
+            if (optionCount >= 6) {
+                alert("You can't add more than 6 options.");
+                return;
+            }
+
+            let newOption = document.createElement('div');
+            newOption.classList.add('option');
+            newOption.innerHTML = `
+        <input type="text" class="option-text" placeholder="Option ${optionCount + 1}" required>
+        <input type="radio" name="correct-option" value="${optionCount}">
+    `;
+
+            optionsContainer.appendChild(newOption);
+        });
+    </script>
+</body>
+</html>
